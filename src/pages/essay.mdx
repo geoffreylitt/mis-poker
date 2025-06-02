@@ -107,14 +107,12 @@ We could run separate studies with different proposal distributions:
 
 But it's more efficient to combine samples from both approaches. This leads us to **Multiple Importance Sampling**.
 
-### The Memory-Based Approach
+### To remember, or not?
 
 The straightforward approach is to remember which proposal generated each sample, then apply the appropriate weight:
 
 - Sample from face proposal → weight = $\frac{p(\text{card})}{p_{\text{face}}(\text{card})}$
 - Sample from red proposal → weight = $\frac{p(\text{card})}{p_{\text{red}}(\text{card})}$
-
-### The Balance Heuristic: A Clever Trick
 
 But there's a more sophisticated approach that doesn't require remembering the source. Instead of using the weight from the actual proposal, we can use a **combined weight** that considers all proposals:
 
@@ -124,7 +122,16 @@ Where $\alpha_1$ and $\alpha_2$ are the mixing proportions (e.g., 50% from each 
 
 This might seem strange—why would this work when we're ignoring which proposal actually generated the sample?
 
-## Demo 5: Memory vs Memoryless Comparison
+The key insight is that **once we have a sample, it doesn't matter which proposal generated it**. A red Jack is a red Jack regardless of whether it came from the "face card bias" proposal or the "red card bias" proposal.
+
+Think of it this way: instead of having separate proposals, imagine we have one meta-proposal that works like this:
+
+1. First, randomly choose which proposal to use (e.g., 50% face bias, 50% red bias)
+2. Then sample from that chosen proposal
+
+From this perspective, the probability of getting any particular card is exactly the weighted mixture we use in the balance heuristic! The mathematical beauty is that this mixed probability automatically gives us the variance-minimizing weights.
+
+When a sample could plausibly come from multiple proposals (like our red Jack), the balance heuristic naturally reduces its weight compared to the memory-based approach. This prevents any single "lucky" sample from having outsized influence on our estimate.
 
 Let's see both approaches in action, step by step.
 
@@ -163,10 +170,6 @@ Let's see how both MIS approaches perform over time.
 - **Cyan line**: Balance heuristic MIS (memoryless optimal weighting)
 
 Both converge to the same value!
-
-### Why Balance Heuristic Works Better
-
-The balance heuristic automatically balances the contributions from different proposals. If a sample is likely under multiple proposals, it gets weighted appropriately. This optimal balancing leads to lower variance estimates.
 
 ## Back to Poker: Solving the Original Problem
 
