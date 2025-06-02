@@ -85,8 +85,6 @@ And our estimator becomes:
 
 $$E[f(X)] \approx \frac{1}{N} \sum_{i=1}^{N} f(x_i) \cdot w(x_i)$$
 
-## Demo 4: Weighted vs Naive Convergence
-
 Let's see both approaches side by side to really drive home the difference.
 
 <WeightedConvergenceDemo client:load />
@@ -160,8 +158,6 @@ Where:
 
 This weighting scheme is **provably optimal**—it minimizes the variance of the estimator among all possible ways of combining the proposals.
 
-## Demo 6: MIS Convergence Comparison
-
 Let's see how both MIS approaches perform over time.
 
 <MISConvergenceDemo client:load />
@@ -169,58 +165,16 @@ Let's see how both MIS approaches perform over time.
 - **Orange line**: Memory-based MIS (tracks sample sources)
 - **Cyan line**: Balance heuristic MIS (memoryless optimal weighting)
 
-Both converge to the same value!
+Both lines converge to the same value! We can see that the balance heuristic works, and simplifies our code.
 
-## Back to Poker: Solving the Original Problem
+## Future work / todos
 
-Now we can tackle our original question about poker straights. The key insight is to design multiple proposal distributions that oversample the cases we care about:
+We're not done yet.
 
-### Proposal Distribution 1: Straight-Heavy Sampling
+To fully tackle the problem at the top of this essay, we'll need to move beyond drawing a single card. Dealing a specific kind of poker hand requires reasoning about _joint probabilities_ across multiple cards. So we'll need to consider questions like:
 
-Remove cards from the deck that would block straights. This makes it much more likely that dealt hands will contain straights.
+- how do we choose a good proposal distribution to increase the chance of satisfying a predicate like "both players have a straight"?
+- how does the choice of proposal affect the results we end up with?
+- can we construct a system that automatically chooses good proposals based on the user's desired predicate?
 
-### Proposal Distribution 2: High-Card Straight Sampling
-
-Among hands that make straights, bias toward higher-ranking straights (since higher straights typically win against lower straights).
-
-### Proposal Distribution 3: Both-Player Straight Sampling
-
-Use a sophisticated dealing algorithm that specifically tries to give both players straights simultaneously.
-
-### Proposal Distribution 4: Uniform Sampling
-
-Keep some uniform sampling for unbiased coverage of edge cases.
-
-With these multiple proposals and balance heuristic weighting, we can generate hundreds of "both players have straights" scenarios from just thousands of samples instead of millions.
-
-## Demo 7: Poker Straight Win Probability
-
-Our final demonstration: estimating P(Player A wins | both have straights) using MIS.
-
-<PokerStraightDemo client:load />
-
-The demo shows:
-
-- Rapid accumulation of "both straights" cases through smart proposals
-- Running estimate of win probability with confidence bounds
-- Comparison to uniform sampling (which would take forever)
-
-### The Final Result
-
-Through Multiple Importance Sampling with balance heuristic weighting, we can reliably estimate:
-
-**P(Player A wins | both players have straights) ≈ [see demo above]**
-
-This estimate is based on hundreds of relevant examples instead of the 0-2 examples we'd get from uniform sampling.
-
-## What We've Learned
-
-Multiple Importance Sampling with the balance heuristic is a powerful technique for rare event estimation:
-
-1. **Design multiple proposal distributions** that oversample different aspects of the rare event
-2. **Use balance heuristic weighting** to optimally combine proposals without tracking sources
-3. **Achieve reliable estimates** with orders of magnitude fewer samples
-
-The technique applies whenever you need to estimate properties of rare events: from computer graphics rendering to financial risk assessment to scientific simulation.
-
-But the core insight remains elegantly simple: **sample more from interesting regions, then correct mathematically for the bias**.
+More on that soon!
