@@ -1,0 +1,223 @@
+---
+layout: "../layouts/Layout.astro"
+---
+
+import UniformCardDemo from "../components/UniformCardDemo.jsx";
+import FaceBiasedDemo from "../components/FaceBiasedDemo.jsx";
+import WeightedAverageDemo from "../components/WeightedAverageDemo.jsx";
+import WeightedConvergenceDemo from "../components/WeightedConvergenceDemo.jsx";
+import MISComparisonDemo from "../components/MISComparisonDemo.jsx";
+import MISConvergenceDemo from "../components/MISConvergenceDemo.jsx";
+import PokerStraightDemo from "../components/PokerStraightDemo.jsx";
+
+# Sampling interesting data with MIS
+
+Imagine you're building a poker AI and need to answer this question: **"In heads-up Texas Hold'em, when both players have a straight, what's the probability that Player A wins?"**
+
+If you try to estimate that by dealing random poker hands, you'll quickly discover a problem. You could deal thousands of hands and only see a small number of cases where both players have straights.
+
+This is the core challenge: **how do you get enough data about rare events to make reliable estimates?**
+
+## Introducing multiple importance sampling
+
+The answer is a technique called **Multiple Importance Sampling**. The basic idea is simple:
+
+> Sample more from "interesting" parts of the space, but track how much you're oversampling and correct for it later.
+
+Think of it like political polling. Instead of calling random phone numbers, you might oversample from voter registration lists, political rally attendees, and social media groups. But then you must reweight each response based on how likely you were to reach that type of person. This gives you better estimates with fewer total calls.
+
+Before we tackle poker hands, let's start with something much simpler. We'll draw cards from a standard deck and track the **average numeric rank** (we'll treat the face cards as A=1, J=11, Q=12, K=13) and **face card rate** (should be 3/13 ~= 23.1%). We can confirm these stats by drawing some cards:
+
+<UniformCardDemo client:load />
+
+This gives us our baseline. With uniform sampling, the average rank converges to 7.0 and face cards appear about 23.1% of the time. What we've just demonstrated is sampling from the **target distribution**—the distribution we actually care about. In this case, it's uniform over all 52 cards, so every card has probability 1/52.
+
+## The problem with biased sampling
+
+Now let's try something different. What if we oversample face cards—making Jacks, Queens, and Kings three times more likely to appear? This biased sampling represents a **proposal distribution**—an alternative way of generating samples that differs from our target. Face cards now have probability 3/52 each, while other cards still have probability 1/52.
+
+<FaceBiasedDemo client:load />
+
+Notice what happens:
+
+- Average rank converges to about 8.58 instead of 7.0 (since face cards get 3× weight: $\frac{4 \times 55 + 4 \times 36 \times 3}{40 + 12 \times 3} = \frac{652}{76} = 8.58$)
+- Face card rate jumps to about 46.2% instead of 23.1%
+
+This demonstrates the fundamental problem with biased sampling: **you get biased estimates**.
+
+## The Fix: Importance Weights
+
+Here's the key insight: we can correct for the bias mathematically using **importance weights**.
+
+For each sample, we compute:
+
+$$\text{Weight} = \frac{P(\text{sample in target distribution})}{P(\text{sample in proposal distribution})}$$
+
+In our example:
+
+- **Face cards**: Weight = $\frac{1/52}{3/52} = \frac{1}{3}$
+- **Regular cards**: Weight = $\frac{1/52}{1/52} = 1$
+
+Then we compute a **weighted average**:
+
+$$\text{Corrected Estimate} = \frac{\sum (\text{value} \times \text{weight})}{\sum \text{weight}}$$
+
+Let's see this correction in action by stepping through some individual cards. Try clicking next until you find a face card—those cards are oversampled by 3×, so we downweight them by 1/3 to compensate.
+
+<WeightedAverageDemo client:load />
+
+For each card, we show:
+
+- The card and its rank value
+- Whether it came from biased sampling (face cards 3× more likely)
+- The importance weight calculation: $\frac{P(\text{target})}{P(\text{proposal})}$
+- How this weight affects the running weighted average
+
+Watch how the weighted average converges toward 7.0 even though we're drawing from biased samples.
+
+### Formal Definition: Importance Sampling
+
+This technique is called **importance sampling**. We're sampling from a proposal distribution $q(x)$ but want to estimate expectations under the target distribution $p(x)$. The importance weight for sample $x$ is:
+
+$$w(x) = \frac{p(x)}{q(x)}$$
+
+And our estimator becomes:
+
+$$E[f(X)] \approx \frac{1}{N} \sum_{i=1}^{N} f(x_i) \cdot w(x_i)$$
+
+## Demo 4: Weighted vs Naive Convergence
+
+Let's see both approaches side by side to really drive home the difference.
+
+<WeightedConvergenceDemo client:load />
+
+- **Red line**: Naive average from biased samples (converges to wrong answer ~8.58)
+- **Green line**: Weighted average using importance sampling (converges to correct answer ~7.0)
+
+This demonstrates the power of importance sampling: we can use biased samples but still get unbiased estimates through proper reweighting.
+
+## Multiple Proposals: The Next Challenge
+
+So far we've used one biased proposal distribution. But what if we want to study multiple aspects simultaneously? For instance, what if we're interested in both face cards AND red cards?
+
+We could run separate studies with different proposal distributions:
+
+1. **Face card bias**: Jacks, Queens, Kings are 3× more likely
+2. **Red card bias**: Hearts and Diamonds are 2× more likely
+
+But it's more efficient to combine samples from both approaches. This leads us to **Multiple Importance Sampling**.
+
+### The Memory-Based Approach
+
+The straightforward approach is to remember which proposal generated each sample, then apply the appropriate weight:
+
+- Sample from face proposal → weight = $\frac{p(\text{card})}{p_{\text{face}}(\text{card})}$
+- Sample from red proposal → weight = $\frac{p(\text{card})}{p_{\text{red}}(\text{card})}$
+
+### The Balance Heuristic: A Clever Trick
+
+But there's a more sophisticated approach that doesn't require remembering the source. Instead of using the weight from the actual proposal, we can use a **combined weight** that considers all proposals:
+
+$$\text{Weight} = \frac{p(\text{card})}{\alpha_1 \cdot p_{\text{face}}(\text{card}) + \alpha_2 \cdot p_{\text{red}}(\text{card})}$$
+
+Where $\alpha_1$ and $\alpha_2$ are the mixing proportions (e.g., 50% from each proposal).
+
+This might seem strange—why would this work when we're ignoring which proposal actually generated the sample?
+
+## Demo 5: Memory vs Memoryless Comparison
+
+Let's see both approaches in action, step by step.
+
+<MISComparisonDemo client:load />
+
+For each card drawn, we show:
+
+- Which proposal it actually came from (face biased or red biased)
+- **Memory-based weight**: Using the actual source proposal
+- **Memoryless weight**: Using the combined probability across all proposals
+- How both contribute to running weighted averages
+
+Notice that for some cards (like a red Jack), the weights differ significantly between approaches, but both averages should converge to the correct value of 7.0.
+
+### Formal Definition: Balance Heuristic
+
+The memoryless approach is called the **balance heuristic**. For a sample $x$, the weight is:
+
+$$w(x) = \frac{p(x)}{\sum_j \frac{n_j}{N} \cdot q_j(x)}$$
+
+Where:
+
+- $p(x)$ is the target density
+- $q_j(x)$ is the density under proposal $j$
+- $\frac{n_j}{N}$ is the fraction of samples from proposal $j$
+
+This weighting scheme is **provably optimal**—it minimizes the variance of the estimator among all possible ways of combining the proposals.
+
+## Demo 6: MIS Convergence Comparison
+
+Let's see how both MIS approaches perform over time.
+
+<MISConvergenceDemo client:load />
+
+- **Orange line**: Memory-based MIS (tracks sample sources)
+- **Cyan line**: Balance heuristic MIS (memoryless optimal weighting)
+
+Both converge to the same value!
+
+### Why Balance Heuristic Works Better
+
+The balance heuristic automatically balances the contributions from different proposals. If a sample is likely under multiple proposals, it gets weighted appropriately. This optimal balancing leads to lower variance estimates.
+
+## Back to Poker: Solving the Original Problem
+
+Now we can tackle our original question about poker straights. The key insight is to design multiple proposal distributions that oversample the cases we care about:
+
+### Proposal Distribution 1: Straight-Heavy Sampling
+
+Remove cards from the deck that would block straights. This makes it much more likely that dealt hands will contain straights.
+
+### Proposal Distribution 2: High-Card Straight Sampling
+
+Among hands that make straights, bias toward higher-ranking straights (since higher straights typically win against lower straights).
+
+### Proposal Distribution 3: Both-Player Straight Sampling
+
+Use a sophisticated dealing algorithm that specifically tries to give both players straights simultaneously.
+
+### Proposal Distribution 4: Uniform Sampling
+
+Keep some uniform sampling for unbiased coverage of edge cases.
+
+With these multiple proposals and balance heuristic weighting, we can generate hundreds of "both players have straights" scenarios from just thousands of samples instead of millions.
+
+## Demo 7: Poker Straight Win Probability
+
+Our final demonstration: estimating P(Player A wins | both have straights) using MIS.
+
+<PokerStraightDemo client:load />
+
+The demo shows:
+
+- Rapid accumulation of "both straights" cases through smart proposals
+- Running estimate of win probability with confidence bounds
+- Comparison to uniform sampling (which would take forever)
+
+### The Final Result
+
+Through Multiple Importance Sampling with balance heuristic weighting, we can reliably estimate:
+
+**P(Player A wins | both players have straights) ≈ [see demo above]**
+
+This estimate is based on hundreds of relevant examples instead of the 0-2 examples we'd get from uniform sampling.
+
+## What We've Learned
+
+Multiple Importance Sampling with the balance heuristic is a powerful technique for rare event estimation:
+
+1. **Design multiple proposal distributions** that oversample different aspects of the rare event
+2. **Use balance heuristic weighting** to optimally combine proposals without tracking sources
+3. **Achieve reliable estimates** with orders of magnitude fewer samples
+
+The technique applies whenever you need to estimate properties of rare events: from computer graphics rendering to financial risk assessment to scientific simulation.
+
+But the core insight remains elegantly simple: **sample more from interesting regions, then correct mathematically for the bias**.

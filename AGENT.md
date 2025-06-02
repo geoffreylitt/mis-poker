@@ -1,0 +1,3 @@
+- This is an Astro / React / Tailwind project.
+- There is probably already a dev server running at localhost:4321. Try accessing that first before spinning up a new server.
+- Use Playwright tool to validate your work. But try to only access those browser checks sparingly to avoid wasting tokens - just check once when you're done with a step.
